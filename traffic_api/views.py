@@ -6,9 +6,11 @@ from django.db.models import Q, OuterRef, Subquery, F
 from datetime import timedelta
 from traffic_monitoring_api.settings import LOW_SPEED_THRESHOLD, HIGH_SPEED_THRESHOLD
 from .permissions import IsAdminOrReadOnly, IsAnonymousReadOnly, HasAPIKey
-from .models import TrafficReadings, RoadSegments
+from .models import TrafficReadings, RoadSegments, Sensors, SensorReadings, Cars
 from .serializers import (TrafficReadingsSerializer, CreateTrafficReadingSerializer,
-                        RoadSegmentsSerializer, CreateRoadSegmentSerializer)
+                        RoadSegmentsSerializer, CreateRoadSegmentSerializer,
+                        SensorsSerializer, SensorReadingsSerializer, CreateSensorReadingSerializer,
+                        CarsSerializer)
 
 
 
@@ -145,3 +147,89 @@ class CreateRoadSegmentView(CreateAPIView):
         if self.request.user.is_staff:
             return [IsAdminOrReadOnly()]
         return [IsAnonymousReadOnly()]
+
+
+## SENSORS ------------------------------------------------------------------------------------------------------
+# 13 - ALL SENSORS
+class SensorsView(ListAPIView):
+    queryset = Sensors.objects.all()
+    serializer_class = SensorsSerializer
+
+# 14 - UPDATE OR DELETE INDIVIDUAL SENSORS (only for admin use)
+class SensorsUpdateView(RetrieveUpdateDestroyAPIView):
+    def get_permissions(self):
+        if self.request.user.is_staff:
+            return [IsAdminOrReadOnly()]
+        return [IsAnonymousReadOnly()]
+    
+    queryset = Sensors.objects.all()
+    serializer_class = SensorsSerializer
+
+# 15 - ALL SENSOR READINGS
+class SensorReadingsView(ListAPIView):
+    queryset = SensorReadings.objects.all()
+    serializer_class = SensorReadingsSerializer
+
+# 16 - UPDATE OR DELETE INDIVIDUAL SENSOR READINGS (only for admin use)
+class SensorReadingsUpdateView(RetrieveUpdateDestroyAPIView):
+    def get_permissions(self):
+        if self.request.user.is_staff:
+            return [IsAdminOrReadOnly()]
+        return [IsAnonymousReadOnly()]
+    
+    queryset = SensorReadings.objects.all()
+    serializer_class = SensorReadingsSerializer
+
+# 17 - CREATE NEW SENSOR READING (for admin use only)
+class CreateSensorReadingView(CreateAPIView):
+    query_set = SensorReadings.objects.all()
+    serializer_class = CreateSensorReadingSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+
+
+## CARS ---------------------------------------------------------------------------------------------------------
+# 18 - ALL CARS
+class CarsView(ListAPIView):
+    queryset = Cars.objects.all()
+    serializer_class = CarsSerializer
+
+# 19 - INDIVIDUAL CARS
+class CarDetailsView(RetrieveAPIView):
+    queryset = Cars.objects.all()
+    serializer_class = CarsSerializer
+    
+    def get_permissions(self):
+        if self.request.user.is_staff:
+            return [IsAdminOrReadOnly()]
+        return [IsAnonymousReadOnly()]
+    
+    def get(self, request, car_license_plate, *args, **kwargs):
+        license_plate = car_license_plate
+        cars = Cars.objects.filter(Q(car_license_plate__icontains=license_plate))
+        serializer = CarsSerializer(cars, many=True)
+        
+        car_instance = cars.first()
+        
+        # Filter sensor readings for the last 24 hours
+        cutoff_time = timezone.now() - timedelta(hours=24)
+        sensor_readings = car_instance.sensorreadings_set.filter(timestamp__gte=cutoff_time)
+        sensor_readings_serializer = SensorReadingsSerializer(sensor_readings, many=True)
+
+        # Extract road segment and sensor IDs from the filtered sensor readings
+        road_segment_ids = sensor_readings.values_list('road_segment_id', flat=True).distinct()
+        sensor_ids = sensor_readings.values_list('sensor_uuid', flat=True).distinct()
+
+        # Retrieve related road segments and sensors for the last 24 hours
+        road_segments_data = RoadSegments.objects.filter(id__in=road_segment_ids)
+        road_segments_serializer = RoadSegmentsSerializer(road_segments_data, many=True)
+
+        sensors_data = Sensors.objects.filter(id__in=sensor_ids)
+        sensors_serializer = SensorsSerializer(sensors_data, many=True)
+        
+        return Response({
+            'car': serializer.data,
+            'sensor_readings': sensor_readings_serializer.data,
+            'sensors': sensors_serializer.data,
+            'road_segments': road_segments_serializer.data,
+        })
