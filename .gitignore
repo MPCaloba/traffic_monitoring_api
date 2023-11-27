@@ -1,0 +1,17 @@
+# .gitignore
+
+# Python bytecode files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Database
+*.psql
+
+# Virtual environment
+venv/
+
+# Dependency files
+pip-*.log
+requirements.txt
