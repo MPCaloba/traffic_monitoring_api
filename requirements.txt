@@ -1,0 +1,16 @@
+# Python version
+python==3.11.5
+
+# Django version
+Django==4.2.7
+
+# Django Rest Framework version
+djangorestframework==3.14
+
+# PostgreSQL version 16.0
+
+# psycopg2 version
+psycopg2==2.9.9
+
+# Swagger API
+drf-yasg==1.21.7
