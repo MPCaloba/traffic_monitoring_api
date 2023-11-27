@@ -149,6 +149,7 @@ class CreateRoadSegmentView(CreateAPIView):
         return [IsAnonymousReadOnly()]
 
 
+
 ## SENSORS ------------------------------------------------------------------------------------------------------
 # 13 - ALL SENSORS
 class SensorsView(ListAPIView):
